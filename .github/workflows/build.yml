@@ -9,54 +9,43 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
     steps:
-      - name: Checkout this repo (rasi.patch)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
-          path: rasi
-
-      - name: Checkout FUTO Keyboard (with submodules)
-        uses: actions/checkout@v4
-        with:
-          repository: futo-org/android-keyboard
-          path: src
           submodules: recursive
+          lfs: true
 
       - name: Apply Rasi patch
-        working-directory: src
-        run: git apply --whitespace=nowarn ../rasi/rasi.patch
+        run: git apply --whitespace=nowarn rasi.patch
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install NDK
-        run: sdkmanager --install "ndk;28.2.13676358"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build APK
-        working-directory: src
+      - name: Install NDK and CMake
         run: |
-          chmod +x gradlew
-          ./gradlew assembleStableDebug --no-daemon --stacktrace
+          SDKM=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" -name sdkmanager -type f | head -1)
+          echo "Using $SDKM"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "ndk;28.2.13676358" "cmake;3.22.1"
 
-      - name: Collect APK
+      - name: Build
+        run: ./gradlew assembleUnstableDebug --no-daemon
+
+      - name: Publish APK to Releases (no zip, direct download)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          APK=$(find src -name "*.apk" -path "*tableDebug*" | head -n 1)
+          APK=$(find . -name "*.apk" -not -path "*/intermediates/*" | head -1)
           echo "Found: $APK"
+          if [ -z "$APK" ]; then
+            echo "No APK found. All apk files:"
+            find . -name "*.apk" | head -20
+            exit 1
+          fi
+          ls -lh "$APK"
           cp "$APK" rasi-keyboard.apk
-
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: Rasi Keyboard build ${{ github.run_number }}
-          files: rasi-keyboard.apk
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest rasi-keyboard.apk --title "Rasi Keyboard" --notes "Free, modi
+          "fixed copy of FUTO Keyboard. See RASI-MODIFIED.md"
