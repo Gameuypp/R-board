@@ -47,5 +47,4 @@ jobs:
           ls -lh "$APK"
           cp "$APK" rasi-keyboard.apk
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest rasi-keyboard.apk --title "Rasi Keyboard" --notes "Free, modi
-          "fixed copy of FUTO Keyboard. See RASI-MODIFIED.md"
+          gh release create latest rasi-keyboard.apk --title "Rasi Keyboard" --notes "Free, modified copy of FUTO Keyboard. See RASI-MODIFIED.md"
